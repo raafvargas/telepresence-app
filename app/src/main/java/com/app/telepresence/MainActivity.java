@@ -72,26 +72,24 @@ public class MainActivity extends AppCompatActivity {
                     Connection connection = factory.newConnection();
                     Channel channel = connection.createChannel();
 
-                    channel.queueDeclare("287aa9c8-a165-4662-8201-623dec1ab43a", true, false, false, null);
+                    AMQP.Queue.DeclareOk q = channel.queueDeclare("robot-287aa9c8-a165-4662-8201-623dec1ab43a", true, true, false, null);
+                    channel.queueBind("robot-287aa9c8-a165-4662-8201-623dec1ab43a", "287aa9c8-a165-4662-8201-623dec1ab43a", "");
 
-                    Consumer consumer = new DefaultConsumer(channel) {
-                        @Override
-                        public void handleDelivery(String consumerTag, Envelope envelope, AMQP.BasicProperties properties, byte[] body)
-                                throws IOException {
-                            String message = new String(body, "UTF-8");
+                    QueueingConsumer consumer = new QueueingConsumer(channel);
+                    channel.basicConsume(q.getQueue(), true, consumer);
 
-                            Log.d("", "New message: " + message);
+                    channel.basicConsume("robot-287aa9c8-a165-4662-8201-623dec1ab43a", true, consumer);
 
-                            Message msg = new Message();
-                            Bundle bundle = new Bundle();
-                            bundle.putString("msg", message);
-                            msg.setData(bundle);
-
-                            handler.sendMessage(msg);
-                        }
-                    };
-
-                    channel.basicConsume("287aa9c8-a165-4662-8201-623dec1ab43a", true, consumer);
+                    while (true) {
+                        QueueingConsumer.Delivery delivery = consumer.nextDelivery();
+                        String message = new String(delivery.getBody());
+                        Log.d("","[r] " + message);
+                        Message msg = handler.obtainMessage();
+                        Bundle bundle = new Bundle();
+                        bundle.putString("msg", message);
+                        msg.setData(bundle);
+                        handler.sendMessage(msg);
+                    }
                 }
                 catch (Exception e) {
                     Log.d("", "Connection broken: " + e.getClass().getName());
